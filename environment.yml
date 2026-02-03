@@ -1,0 +1,9 @@
+name: cognitive modeling 
+dependencies:
+- python = 3.10
+- numpy
+- matplotlib
+- jupyter
+- jupyterlab
+- ipkernel
+- pip
