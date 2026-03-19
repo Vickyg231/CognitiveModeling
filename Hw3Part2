@@ -1,0 +1,221 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+def simulate_diffusion(v, a, beta, tau, dt=1e-3, scale=1.0, max_time=10.0):
+    """
+    Simulate a single Drift Diffusion Model (DDM) trial.
+    Returns response time and decision.
+    """
+
+    # Starting point
+    y = beta * a
+
+    # Time tracking
+    t = 0.0
+    noise_scale = scale * np.sqrt(dt)
+
+    while True:
+
+        # Diffusion step
+        y += v * dt + noise_scale * np.random.randn()
+        t += dt
+
+        # Boundary checks
+        if y >= a:
+            return (tau + t, 1)
+
+        if y <= 0:
+            return (tau + t, 0)
+
+def simulate_diffusion_n(num_sims, v, a, beta, tau, dt=1e-3, scale=1.0, max_time=10.0):
+    """
+    Run multiple Drift Diffusion Model simulations.
+    Returns an array: [response_time, decision].
+    """
+
+    results = np.zeros((num_sims, 2))
+
+    for i in range(num_sims):
+        rt, decision = simulate_diffusion(v, a, beta, tau, dt, scale, max_time)
+        results[i, 0] = rt
+        results[i, 1] = decision
+
+    return results
+
+def visualize_diffusion_model(data, figsize=(8, 6)):
+    """
+    Plot RT distributions for correct vs incorrect decisions.
+    """
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    correct_rt = data[data[:, 1] == 1, 0]
+    incorrect_rt = data[data[:, 1] == 0, 0]
+
+    sns.histplot(correct_rt, color="maroon", label="Correct responses", ax=ax)
+    sns.histplot(incorrect_rt, color="gray", label="Incorrect responses", ax=ax)
+
+    sns.despine()
+
+    ax.set_xlabel("Response time (s)", fontsize=20)
+    ax.set_ylabel("")
+    ax.set_yticks([])
+    ax.legend(fontsize=20)
+
+    return fig
+
+# Generate data for varying drift rates
+drift_rates = np.linspace(0.5, 1.5, 25)
+
+mean_upper_rts = []
+mean_lower_rts = []
+
+for v in drift_rates:
+
+    data = simulate_diffusion_n(2000, v, a=3, beta=0.5, tau=0.7)
+
+    upper_rts = data[data[:, 1] == 1, 0]
+    lower_rts = data[data[:, 1] == 0, 0]
+
+    mean_upper_rts.append(np.mean(upper_rts))
+    mean_lower_rts.append(np.mean(lower_rts))
+
+mean_upper_rts = np.array(mean_upper_rts)
+mean_lower_rts = np.array(mean_lower_rts)
+
+
+# Plot mean RTs
+
+plt.figure(figsize=(10,6))
+
+plt.plot(drift_rates, mean_upper_rts, color='purple', marker='o', label="Mean RT (Upper Boundary)")
+plt.plot(drift_rates, mean_lower_rts, color='yellow', marker='o', label="Mean RT (Lower Boundary)")
+
+plt.xlabel("Drift Rate (v)")
+plt.ylabel("Mean Response Time (s)")
+plt.title("Mean Response Time vs Drift Rate")
+
+plt.legend()
+plt.show()
+
+
+# Compute difference
+
+mean_rt_difference = mean_upper_rts - mean_lower_rts
+
+
+
+# Plot difference
+
+plt.figure(figsize=(10,6))
+
+plt.plot(drift_rates, mean_rt_difference, color='green', label="Upper − Lower")
+
+plt.xlabel("Drift Rate (v)")
+plt.ylabel("Mean Response Time Difference")
+plt.title("Difference in Mean RTs Between Boundaries")
+
+plt.legend()
+plt.show()
+
+
+def analyze_parameter_impact_on_rts(param_values, param_name, fixed_params):
+    """
+    Simulates DDM trials while varying one parameter and computes
+    mean and std RTs for upper and lower boundaries.
+    """
+
+    n_values = len(param_values)
+    results = np.zeros((n_values, 4))
+
+    for i, value in enumerate(param_values):
+
+        # Update parameters
+        params = fixed_params.copy()
+        params[param_name] = value
+
+        # Run simulations
+        data = simulate_diffusion_n(2000, **params)
+
+        # Separate RTs
+        upper_rts = data[data[:, 1] == 1, 0]
+        lower_rts = data[data[:, 1] == 0, 0]
+
+        # Compute statistics safely
+        results[i, 0] = np.mean(upper_rts) if len(upper_rts) > 0 else np.nan
+        results[i, 1] = np.std(upper_rts) if len(upper_rts) > 0 else np.nan
+        results[i, 2] = np.mean(lower_rts) if len(lower_rts) > 0 else np.nan
+        results[i, 3] = np.std(lower_rts) if len(lower_rts) > 0 else np.nan
+
+    return results
+
+def plot_stats_separate(param_range, stats, param_name):
+    """
+    Plots mean RTs, standard deviations, and mean RT differences
+    """
+
+    mean_upper = stats[:, 0]
+    std_upper = stats[:, 1]
+    mean_lower = stats[:, 2]
+    std_lower = stats[:, 3]
+
+    mean_diff = mean_upper - mean_lower
+    
+    # 1. Mean RTs
+    
+    plt.figure(figsize=(8,6))
+    plt.plot(param_range, mean_upper, color='purple', marker='o', label="Upper Mean RT")
+    plt.plot(param_range, mean_lower, color='yellow', marker='o', label="Lower Mean RT")   
+    plt.title(f"Mean RT vs {param_name}")
+    plt.xlabel(param_name)
+    plt.ylabel("Mean RT")
+    plt.legend()
+    plt.show()
+
+    # 2. Std RTs
+    
+    plt.figure(figsize=(8,6))
+    plt.plot(param_range, std_upper, color='blue', marker='o', linestyle='--', label="Upper Std RT")
+    plt.plot(param_range, std_lower, color='red', marker='o', linestyle='--', label="Lower Std RT")
+    plt.title(f"Std RT vs {param_name}")
+    plt.xlabel(param_name)
+    plt.ylabel("Std RT")
+    plt.legend()
+    plt.show()
+
+    # 3. Mean RT Difference
+    plt.figure(figsize=(8,6))
+    plt.plot(param_range, mean_diff, color='green', label="Upper − Lower")
+    plt.title(f"Mean RT Difference vs {param_name}")
+    plt.xlabel(param_name)
+    plt.ylabel("Mean RT Difference")
+    plt.legend()
+    plt.show()
+
+
+# Fixed DDM parameters
+fixed_params = {
+    "v": 1,
+    "a": 3,
+    "beta": 0.5,
+    "tau": 0.7
+}
+
+
+# Parameter ranges to test
+
+a_range = np.linspace(2, 5, 15)
+beta_range = np.linspace(0.3, 0.7, 15)
+tau_range = np.linspace(0.5, 1.0, 15)
+
+# Run simulations and compute stats
+
+a_stats = analyze_parameter_impact_on_rts(a_range, "a", fixed_params)
+beta_stats = analyze_parameter_impact_on_rts(beta_range, "beta", fixed_params)
+tau_stats = analyze_parameter_impact_on_rts(tau_range, "tau", fixed_params)
+
+# Plot results in separate graphs
+
+plot_stats_separate(a_range, a_stats, "a")
+plot_stats_separate(beta_range, beta_stats, "beta")
+plot_stats_separate(tau_range, tau_stats, "tau")
