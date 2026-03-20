@@ -1,38 +1,87 @@
-
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
 
 
-# Parameters
-mu0 = 15 # Prior mean
-sigma0 = 4 # Prior STD
-truemu = 8 # True mean
-sigma = 5 # Observation STD
-n = 20 # Sample size
+# -----------------------------
+# Model parameters
+# -----------------------------
 
-# Finding data
-snoozeTimes = np.random.normal(loc = truemu, scale = sigma, size = n)
-average = np.average(snoozeTimes)
-variancePosterior = 1 / ((1 / sigma0**2) + (n / sigma**2))
-meanPosterior = variancePosterior * ((mu0 / sigma0**2) + (n * average / sigma**2))
-STDposterior = np.sqrt(variancePosterior)
-linspace = np.linspace(0, 20, 500)
-prior, posterior= norm.pdf(linspace, mu0, sigma0), norm.pdf(linspace, meanPosterior, STDposterior)
+mu0 = 15        # Prior mean (belief about average snooze time)
+sigma0 = 4      # Prior standard deviation (uncertainty in prior)
 
-prior_samples = np.random.normal(mu0, sigma0, 10000)
-posterior_samples = np.random.normal(meanPosterior, STDposterior, 10000)
-plt.figure(figsize=(8,5))
+true_mu = 8     # True mean (unknown in real scenarios)
+sigma = 5       # Observation noise (standard deviation of data)
 
+n = 20          # Number of observations (sample size)
+
+
+# -----------------------------
+# Generate observed data
+# -----------------------------
+
+# Simulate observed snooze times from a normal distribution
+snooze_times = np.random.normal(loc=true_mu, scale=sigma, size=n)
+
+# Compute sample mean of observed data
+sample_mean = np.mean(snooze_times)
+
+
+# -----------------------------
+# Compute posterior distribution
+# -----------------------------
+
+# Posterior variance (derived from conjugate normal-normal model)
+posterior_variance = 1 / ((1 / sigma0**2) + (n / sigma**2))
+
+# Posterior mean (weighted combination of prior mean and sample mean)
+posterior_mean = posterior_variance * (
+    (mu0 / sigma0**2) + (n * sample_mean / sigma**2)
+)
+
+# Posterior standard deviation
+posterior_std = np.sqrt(posterior_variance)
+
+
+# -----------------------------
+# Create distributions for plotting
+# -----------------------------
+
+# Range of values for plotting PDFs
+x_values = np.linspace(0, 20, 500)
+
+# Compute prior and posterior probability density functions
+prior_pdf = norm.pdf(x_values, mu0, sigma0)
+posterior_pdf = norm.pdf(x_values, posterior_mean, posterior_std)
+
+
+# -----------------------------
+# Sample from distributions (for visualization)
+# -----------------------------
+
+# Draw samples to visualize distributions as histograms
+prior_samples = np.random.normal(mu0, sigma0, 10_000)
+posterior_samples = np.random.normal(posterior_mean, posterior_std, 10_000)
+
+
+# -----------------------------
+# Plot results
+# -----------------------------
+
+plt.figure(figsize=(8, 5))
+
+# Plot histograms of prior and posterior samples
 plt.hist(prior_samples, bins=50, alpha=0.5, label="Prior belief")
 plt.hist(posterior_samples, bins=50, alpha=0.5, label="Posterior belief")
 
-plt.axvline(mu0, linestyle='dashed', label="Prior Mean")
-plt.axvline(meanPosterior, linestyle='dashed', label="Posterior Mean")
+# Plot vertical lines for means
+plt.axvline(mu0, linestyle="dashed", label="Prior Mean")
+plt.axvline(posterior_mean, linestyle="dashed", label="Posterior Mean")
 
+# Labels and title
 plt.xlabel("Average Snooze Time (minutes)")
 plt.ylabel("Frequency")
 plt.title("Estimating Average Alarm Snooze Time")
-plt.legend()
 
+plt.legend()
 plt.show()
