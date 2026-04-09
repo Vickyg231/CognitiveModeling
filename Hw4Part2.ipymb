@@ -1,0 +1,164 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+
+from cmdstanpy import CmdStanModel
+import arviz as az
+
+import nest_asyncio
+nest_asyncio.apply()
+
+
+
+data = [5,3,6,6]
+
+stan_dict = {
+    'freqs': data,
+    'N': 20,
+    'K': 4
+}
+
+# -------------------------------
+# Save the Stan model to a file
+# -------------------------------
+mpt_model_code = """
+data {
+  int<lower=1> N; // Number of trials
+  int<lower=1> K; // Number of categories
+  array[K] int<lower=0, upper=N> freqs;
+}
+
+parameters {
+  real<lower = 0, upper=1> d;
+  real<lower = 0, upper=1> g;
+}
+
+transformed parameters {
+  simplex[4] theta;
+  theta[1] = 0.5*(d + (1-d)*g);
+  theta[2] = 0.5*g;
+  theta[3] = 0.5*(1-g);
+  theta[4] = 0.5*(1-d)*(1-g);
+}
+
+model {
+  target += beta_lpdf(d | 1,1);
+  target += beta_lpdf(g | 1,1);
+  target += multinomial_lpmf(freqs | theta);
+}
+
+generated quantities {
+  array[K] int pred_freqs;
+  pred_freqs = multinomial_rng(theta, N);
+}
+"""
+
+stan_file = "mpt_model.stan"
+with open(stan_file, "w") as f:
+    f.write(mpt_model_code)
+
+# -------------------------------
+# Compile the model
+# -------------------------------
+posterior = CmdStanModel(stan_file=stan_file)
+
+# -------------------------------
+# Sample from the posterior
+# -------------------------------
+fit = posterior.sample(
+    data=stan_dict,
+    chains=4,
+    iter_sampling=2500,
+    iter_warmup=1000,
+    seed=42
+)
+
+# -------------------------------
+# Convert to ArviZ for diagnostics
+# -------------------------------
+az_data = az.from_cmdstanpy(fit)
+
+# Traceplot
+azarr = az.plot_trace(fit)
+plt.tight_layout()
+
+# Posterior summary
+print(az.summary(az_data, round_to=3))
+
+
+
+ht2_mpt_model_code = """
+data {
+  int<lower=1> N; // Number of trials
+  int<lower=1> K; // Number of categories
+  array[K] int<lower=0, upper=N> freqs;
+}
+
+parameters {
+  real<lower = 0, upper=1> d;
+  real<lower = 0, upper=1> g;
+}
+
+transformed parameters {
+  // Model equations go here
+  // Prob. True Positive
+  // Prob. False Positive
+  // Prob. True Negative
+  // Prob. False Negative
+  simplex[4] theta;
+  theta[1] = 0.5*(d+(1-d)*g);
+  theta[2] = 0.5*((1-d)*g);
+  theta[3] = 0.5*(d+(1-d)*(1-g));
+  theta[4] = 0.5*((1-d)*(1-g));
+}
+
+model {
+  target+=beta_lpdf(d| 1,1);
+  target+=beta_lpdf(g | 1,1);
+  target+=multinomial_lpmf(freqs | theta);
+}
+
+generated quantities{
+  array[K] int pred_freqs;
+  pred_freqs = multinomial_rng(theta, N);
+}
+"""
+
+
+
+
+# -------------------------------
+# Save the Stan model to a file
+# -------------------------------
+ht2_stan_file = "ht2_mpt_model.stan"
+with open(ht2_stan_file, "w") as f:
+    f.write(ht2_mpt_model_code)
+
+# -------------------------------
+# Compile the model
+# -------------------------------
+ht2_posterior = CmdStanModel(stan_file=ht2_stan_file)
+
+# -------------------------------
+# Sample from the posterior
+# -------------------------------
+ht2_fit = ht2_posterior.sample(
+    data=stan_dict,
+    chains=4,
+    iter_sampling=2500,
+    iter_warmup=1000,
+    seed=42
+)
+
+# -------------------------------
+# Convert to ArviZ for diagnostics
+# -------------------------------
+ht2_az_data = az.from_cmdstanpy(ht2_fit)
+
+# Traceplot
+az.plot_trace(ht2_az_data)
+plt.tight_layout()
+
+# Posterior summary
+print(az.summary(ht2_az_data, round_to=3))
